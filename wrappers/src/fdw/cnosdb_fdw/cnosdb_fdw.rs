@@ -356,6 +356,12 @@ impl ForeignDataWrapper<CnosdbFdwError> for CnosdbFdw {
                 .map_err(|e| CnosdbFdwError::RequestMetaDataError(e.to_string()))?,
         );
 
+        req.metadata_mut().insert(
+            "target_partitions",
+            AsciiMetadataValue::try_from("1")
+                .map_err(|e| CnosdbFdwError::RequestMetaDataError(e.to_string()))?,
+        );
+
         let flight_info = self
             .rt
             .block_on(self.client.get_flight_info(req))
@@ -426,6 +432,9 @@ impl ForeignDataWrapper<CnosdbFdwError> for CnosdbFdw {
                 let column = batch
                     .column_by_name(tgt_col.name.as_str())
                     .ok_or(CnosdbFdwError::ColumnMissingError(tgt_col.name.clone()))?;
+                if column.len() < self.num_rows {
+                    return Ok(None)
+                }
                 let cell = field_to_cell(column, self.num_rows)?;
                 row.push(tgt_col.name.as_str(), cell);
             }
